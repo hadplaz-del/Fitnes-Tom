@@ -57,6 +57,23 @@ ul { padding-left: 20px; margin-bottom: 0; }
 }
 .small { font-size: 14px; color: #666; }
 canvas { max-width: 100%; }
+.check-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.check-item {
+  flex: 1;
+  min-width: 140px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f7f9fb;
+}
+.status-text {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #666;
+}
 </style>
 </head>
 <body>
@@ -67,6 +84,22 @@ canvas { max-width: 100%; }
   <h2 id="day"></h2>
   <p id="training"></p>
   <p class="small">Drž strukturu. Nepotřebuješ dokonalost, potřebuješ opakování.</p>
+</div>
+
+<div class="card">
+  <h3>🌅 Ranní / 🌙 večerní check</h3>
+  <div class="check-row">
+    <div class="check-item">
+      <strong>Ranní check</strong>
+      <div class="status-text" id="morningStatus">Nepotvrzeno</div>
+      <button onclick="toggleSpecialCheck('morning')">Potvrdit</button>
+    </div>
+    <div class="check-item">
+      <strong>Večerní check</strong>
+      <div class="status-text" id="eveningStatus">Nepotvrzeno</div>
+      <button onclick="toggleSpecialCheck('evening')">Potvrdit</button>
+    </div>
+  </div>
 </div>
 
 <div class="card">
@@ -117,8 +150,17 @@ const tasks = [
   "Bez večerního dojídání"
 ];
 
+const specialChecks = [
+  "morning",
+  "evening"
+];
+
 let chartInstance = null;
 let saved = JSON.parse(localStorage.getItem("tasks-" + todayKey)) || {};
+let dailyChecks = JSON.parse(localStorage.getItem("checks-" + todayKey)) || {
+  morning: false,
+  evening: false
+};
 
 document.getElementById("day").innerText = "Dnes: " + days[today];
 
@@ -171,10 +213,47 @@ tasks.forEach((task, i) => {
   list.appendChild(li);
 });
 
+function toggleSpecialCheck(type) {
+  dailyChecks[type] = !dailyChecks[type];
+  localStorage.setItem("checks-" + todayKey, JSON.stringify(dailyChecks));
+  renderSpecialChecks();
+  updateScore();
+  renderHistory();
+  renderWeeklySummary();
+}
+
+function renderSpecialChecks() {
+  document.getElementById("morningStatus").innerText = dailyChecks.morning ? "Potvrzeno" : "Nepotvrzeno";
+  document.getElementById("eveningStatus").innerText = dailyChecks.evening ? "Potvrzeno" : "Nepotvrzeno";
+}
+
+function getDoneTasksCount(dateKey) {
+  const data = JSON.parse(localStorage.getItem("tasks-" + dateKey)) || {};
+  return Object.values(data).filter(v => v).length;
+}
+
+function getDoneChecksCount(dateKey) {
+  const checks = JSON.parse(localStorage.getItem("checks-" + dateKey)) || {};
+  return Object.values(checks).filter(v => v).length;
+}
+
+function getTotalItemsPerDay() {
+  return tasks.length + specialChecks.length;
+}
+
+function getDayPercent(dateKey) {
+  const doneTasks = getDoneTasksCount(dateKey);
+  const doneChecks = getDoneChecksCount(dateKey);
+  const done = doneTasks + doneChecks;
+  const total = getTotalItemsPerDay();
+  return Math.round((done / total) * 100) || 0;
+}
+
 function updateScore() {
-  let done = Object.values(saved).filter(v => v).length;
-  let total = tasks.length;
-  let percent = Math.round((done / total) * 100) || 0;
+  let doneTasks = Object.values(saved).filter(v => v).length;
+  let doneChecks = Object.values(dailyChecks).filter(v => v).length;
+  let total = getTotalItemsPerDay();
+  let percent = Math.round(((doneTasks + doneChecks) / total) * 100) || 0;
 
   let text = percent + "% – ";
   let el = document.getElementById("score");
@@ -185,7 +264,7 @@ function updateScore() {
     text += "Perfektní den";
   } else if (percent >= 75) {
     el.classList.add("ok");
-    text += "Dobrý den, ale hlídej detaily";
+    text += "Dobrý den, ale ještě tam máš rezervu";
   } else {
     el.classList.add("bad");
     text += "Slabý den. Tady se to láme.";
@@ -234,16 +313,6 @@ function loadChart() {
 
 function formatDate(date) {
   return date.toISOString().slice(0, 10);
-}
-
-function getTaskDataForDate(dateKey) {
-  return JSON.parse(localStorage.getItem("tasks-" + dateKey)) || {};
-}
-
-function getDayPercent(dateKey) {
-  const data = getTaskDataForDate(dateKey);
-  const done = Object.values(data).filter(v => v).length;
-  return Math.round((done / tasks.length) * 100) || 0;
 }
 
 function getDayLabel(date) {
@@ -319,16 +388,17 @@ function renderWeeklySummary() {
 
   if (weeklyAverage >= 85) {
     ratingEl.classList.add("good");
-    ratingEl.innerText = "Hodnocení týdne: Výborné. Tohle už dělá výsledek.";
+    ratingEl.innerText = "Hodnocení týdne: Výborné. Tohle dělá výsledek.";
   } else if (weeklyAverage >= 65) {
     ratingEl.classList.add("ok");
-    ratingEl.innerText = "Hodnocení týdne: Solidní. Výsledek přijde, ale máš rezervy.";
+    ratingEl.innerText = "Hodnocení týdne: Solidní. Funguje to, ale máš rezervy.";
   } else {
     ratingEl.classList.add("bad");
-    ratingEl.innerText = "Hodnocení týdne: Slabé. Tady se váha bude zasekávat.";
+    ratingEl.innerText = "Hodnocení týdne: Slabé. Tady se režim rozpadá.";
   }
 }
 
+renderSpecialChecks();
 updateScore();
 loadChart();
 renderHistory();
