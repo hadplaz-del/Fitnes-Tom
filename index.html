@@ -1,1 +1,153 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fit režim</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body { font-family: Arial; margin: 15px; background: #f2f4f7; }
+.card { background: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+h1 { font-size: 22px; }
+button { padding: 8px 12px; border: none; border-radius: 6px; background: #007bff; color: white; }
+.done { text-decoration: line-through; color: gray; }
+input { padding: 8px; width: 100px; }
+</style>
+</head>
+<body>
 
+<h1>💪 Fit režim</h1>
+
+<div class="card">
+<h2 id="day"></h2>
+<p id="training"></p>
+</div>
+
+<div class="card">
+<h3>✔️ Denní úkoly</h3>
+<ul id="tasks"></ul>
+</div>
+
+<div class="card">
+<h3>⚖️ Váha</h3>
+<input type="number" id="weightInput" placeholder="kg">
+<button onclick="saveWeight()">Uložit</button>
+</div>
+
+<div class="card">
+<h3>📈 Vývoj váhy</h3>
+<canvas id="chart"></canvas>
+</div>
+
+<div class="card">
+<h3>🔥 Streak</h3>
+<p id="streak"></p>
+</div>
+
+<script>
+const days = ["Ne", "Po", "Út", "St", "Čt", "Pá", "So"];
+const today = new Date().getDay();
+const todayKey = new Date().toISOString().slice(0,10);
+
+document.getElementById("day").innerText = "Dnes: " + days[today];
+
+let training = "";
+switch(today){
+  case 1:
+  case 4:
+    training = "🔴 Trénink A";
+    break;
+  case 2:
+  case 5:
+    training = "🔵 Trénink B";
+    break;
+  case 3:
+    training = "🚶‍♂️ Chůze / volno";
+    break;
+  case 6:
+    training = "🚴 Lehký pohyb";
+    break;
+  default:
+    training = "🛌 Volno";
+}
+document.getElementById("training").innerText = training;
+
+// ---- TASKS ----
+const tasks = [
+  "Trénink / pohyb",
+  "8 000 kroků",
+  "3 jídla bez zobání",
+  "Bez večerního dojídání"
+];
+
+let saved = JSON.parse(localStorage.getItem("tasks-"+todayKey)) || {};
+
+const list = document.getElementById("tasks");
+
+tasks.forEach((task, i) => {
+  let li = document.createElement("li");
+  let btn = document.createElement("button");
+
+  if(saved[i]) li.classList.add("done");
+
+  btn.innerText = "✔";
+  btn.onclick = () => {
+    li.classList.toggle("done");
+    saved[i] = !saved[i];
+    localStorage.setItem("tasks-"+todayKey, JSON.stringify(saved));
+    updateStreak();
+  };
+
+  li.append(task + " ");
+  li.appendChild(btn);
+  list.appendChild(li);
+});
+
+// ---- WEIGHT ----
+function saveWeight(){
+  let val = document.getElementById("weightInput").value;
+  if(!val) return;
+  let data = JSON.parse(localStorage.getItem("weights")) || {};
+  data[todayKey] = val;
+  localStorage.setItem("weights", JSON.stringify(data));
+  loadChart();
+}
+
+function loadChart(){
+  let data = JSON.parse(localStorage.getItem("weights")) || {};
+  let labels = Object.keys(data);
+  let values = Object.values(data);
+
+  new Chart(document.getElementById("chart"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Váha",
+        data: values
+      }]
+    }
+  });
+}
+
+loadChart();
+
+// ---- STREAK ----
+function updateStreak(){
+  let streak = 0;
+  for(let i=0;i<30;i++){
+    let d = new Date();
+    d.setDate(d.getDate()-i);
+    let key = d.toISOString().slice(0,10);
+    let t = JSON.parse(localStorage.getItem("tasks-"+key));
+    if(t && Object.values(t).every(v => v)) streak++;
+    else break;
+  }
+  document.getElementById("streak").innerText = streak + " dní v řadě";
+}
+
+updateStreak();
+</script>
+
+</body>
+</html>
