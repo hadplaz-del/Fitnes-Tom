@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fit režim</title>
+<title>Fit režim PRO</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body { font-family: Arial; margin: 15px; background: #f2f4f7; }
@@ -11,14 +11,17 @@ body { font-family: Arial; margin: 15px; background: #f2f4f7; }
 h1 { font-size: 22px; }
 button { padding: 8px 12px; border: none; border-radius: 6px; background: #007bff; color: white; }
 .done { text-decoration: line-through; color: gray; }
-input { padding: 8px; width: 100px; }
+.bad { color: red; }
+.ok { color: orange; }
+.good { color: green; }
+.weekend { border-left: 5px solid red; }
 </style>
 </head>
 <body>
 
-<h1>💪 Fit režim</h1>
+<h1>💪 Fit režim PRO</h1>
 
-<div class="card">
+<div class="card" id="dayCard">
 <h2 id="day"></h2>
 <p id="training"></p>
 </div>
@@ -26,6 +29,11 @@ input { padding: 8px; width: 100px; }
 <div class="card">
 <h3>✔️ Denní úkoly</h3>
 <ul id="tasks"></ul>
+</div>
+
+<div class="card">
+<h3>📊 Skóre dne</h3>
+<p id="score"></p>
 </div>
 
 <div class="card">
@@ -39,17 +47,16 @@ input { padding: 8px; width: 100px; }
 <canvas id="chart"></canvas>
 </div>
 
-<div class="card">
-<h3>🔥 Streak</h3>
-<p id="streak"></p>
-</div>
-
 <script>
 const days = ["Ne", "Po", "Út", "St", "Čt", "Pá", "So"];
 const today = new Date().getDay();
 const todayKey = new Date().toISOString().slice(0,10);
 
 document.getElementById("day").innerText = "Dnes: " + days[today];
+
+if(today === 0 || today === 6){
+  document.getElementById("dayCard").classList.add("weekend");
+}
 
 let training = "";
 switch(today){
@@ -72,7 +79,6 @@ switch(today){
 }
 document.getElementById("training").innerText = training;
 
-// ---- TASKS ----
 const tasks = [
   "Trénink / pohyb",
   "8 000 kroků",
@@ -95,7 +101,7 @@ tasks.forEach((task, i) => {
     li.classList.toggle("done");
     saved[i] = !saved[i];
     localStorage.setItem("tasks-"+todayKey, JSON.stringify(saved));
-    updateStreak();
+    updateScore();
   };
 
   li.append(task + " ");
@@ -103,7 +109,31 @@ tasks.forEach((task, i) => {
   list.appendChild(li);
 });
 
-// ---- WEIGHT ----
+function updateScore(){
+  let values = Object.values(saved);
+  let done = values.filter(v => v).length;
+  let total = tasks.length;
+  let percent = Math.round((done/total)*100);
+
+  let text = percent + "% - ";
+  let el = document.getElementById("score");
+
+  if(percent === 100){
+    el.className = "good";
+    text += "Perfektní den";
+  } else if(percent >= 75){
+    el.className = "ok";
+    text += "Dobrý, ale hlídej to";
+  } else {
+    el.className = "bad";
+    text += "Slabý výkon";
+  }
+
+  el.innerText = text;
+}
+
+updateScore();
+
 function saveWeight(){
   let val = document.getElementById("weightInput").value;
   if(!val) return;
@@ -131,22 +161,6 @@ function loadChart(){
 }
 
 loadChart();
-
-// ---- STREAK ----
-function updateStreak(){
-  let streak = 0;
-  for(let i=0;i<30;i++){
-    let d = new Date();
-    d.setDate(d.getDate()-i);
-    let key = d.toISOString().slice(0,10);
-    let t = JSON.parse(localStorage.getItem("tasks-"+key));
-    if(t && Object.values(t).every(v => v)) streak++;
-    else break;
-  }
-  document.getElementById("streak").innerText = streak + " dní v řadě";
-}
-
-updateStreak();
 </script>
 
 </body>
