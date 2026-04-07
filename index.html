@@ -6,10 +6,21 @@
 <title>Fit režim PRO</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-body { font-family: Arial, sans-serif; margin: 15px; background: #f2f4f7; color: #222; }
-.card { background: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+body {
+  font-family: Arial, sans-serif;
+  margin: 15px;
+  background: #f2f4f7;
+  color: #222;
+}
+.card {
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
 h1 { font-size: 24px; margin-bottom: 10px; }
-h2, h3 { margin-top: 0; }
+h2, h3, h4 { margin-top: 0; }
 button {
   padding: 8px 12px;
   border: none;
@@ -32,7 +43,11 @@ input {
   border-radius: 6px;
 }
 ul { padding-left: 20px; margin-bottom: 0; }
-.history-list { list-style: none; padding-left: 0; margin: 0; }
+.history-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
 .history-list li {
   display: flex;
   justify-content: space-between;
@@ -71,8 +86,34 @@ canvas { max-width: 100%; }
 }
 .status-text {
   margin-top: 8px;
+  margin-bottom: 8px;
   font-size: 14px;
   color: #666;
+}
+.task-list li,
+.exercise-list li {
+  margin-bottom: 8px;
+}
+.inline-btn {
+  margin-left: 8px;
+}
+.workout-section {
+  margin-top: 10px;
+}
+.workout-round {
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: #f7f9fb;
+}
+.note-box {
+  padding: 10px;
+  border-radius: 10px;
+  background: #f7f9fb;
+  font-size: 14px;
+}
+.hidden {
+  display: none;
 }
 </style>
 </head>
@@ -92,19 +133,25 @@ canvas { max-width: 100%; }
     <div class="check-item">
       <strong>Ranní check</strong>
       <div class="status-text" id="morningStatus">Nepotvrzeno</div>
-      <button onclick="toggleSpecialCheck('morning')">Potvrdit</button>
+      <button onclick="toggleSpecialCheck('morning')">Potvrdit / zrušit</button>
     </div>
     <div class="check-item">
       <strong>Večerní check</strong>
       <div class="status-text" id="eveningStatus">Nepotvrzeno</div>
-      <button onclick="toggleSpecialCheck('evening')">Potvrdit</button>
+      <button onclick="toggleSpecialCheck('evening')">Potvrdit / zrušit</button>
     </div>
   </div>
 </div>
 
 <div class="card">
   <h3>✔️ Denní úkoly</h3>
-  <ul id="tasks"></ul>
+  <ul id="tasks" class="task-list"></ul>
+</div>
+
+<div class="card">
+  <h3>🏋️ Detail dnešního tréninku</h3>
+  <div id="workoutInfo" class="note-box"></div>
+  <div id="workoutContainer" class="workout-section"></div>
 </div>
 
 <div class="card">
@@ -140,6 +187,7 @@ canvas { max-width: 100%; }
 <script>
 const days = ["Ne", "Po", "Út", "St", "Čt", "Pá", "So"];
 const todayDate = new Date();
+todayDate.setHours(12, 0, 0, 0);
 const today = todayDate.getDay();
 const todayKey = formatDate(todayDate);
 
@@ -150,10 +198,7 @@ const tasks = [
   "Bez večerního dojídání"
 ];
 
-const specialChecks = [
-  "morning",
-  "evening"
-];
+const specialChecks = ["morning", "evening"];
 
 let chartInstance = null;
 let saved = JSON.parse(localStorage.getItem("tasks-" + todayKey)) || {};
@@ -161,6 +206,7 @@ let dailyChecks = JSON.parse(localStorage.getItem("checks-" + todayKey)) || {
   morning: false,
   evening: false
 };
+let workoutSaved = JSON.parse(localStorage.getItem("workout-" + todayKey)) || {};
 
 document.getElementById("day").innerText = "Dnes: " + days[today];
 
@@ -169,27 +215,35 @@ if (today === 0 || today === 6) {
 }
 
 let training = "";
-switch(today){
+let trainingType = "rest";
+
+switch(today) {
   case 1:
   case 4:
     training = "🔴 Trénink A";
+    trainingType = "A";
     break;
   case 2:
   case 5:
     training = "🔵 Trénink B";
+    trainingType = "B";
     break;
   case 3:
     training = "🚶‍♂️ Chůze / volno";
+    trainingType = "walk";
     break;
   case 6:
     training = "🚴 Lehký pohyb";
+    trainingType = "light";
     break;
   default:
     training = "🛌 Volno";
+    trainingType = "rest";
 }
+
 document.getElementById("training").innerText = training;
 
-// Denní úkoly
+// ---------- DENNÍ ÚKOLY ----------
 const list = document.getElementById("tasks");
 
 tasks.forEach((task, i) => {
@@ -199,6 +253,7 @@ tasks.forEach((task, i) => {
   if (saved[i]) li.classList.add("done");
 
   btn.innerText = "✔";
+  btn.className = "inline-btn";
   btn.onclick = () => {
     li.classList.toggle("done");
     saved[i] = !saved[i];
@@ -213,6 +268,7 @@ tasks.forEach((task, i) => {
   list.appendChild(li);
 });
 
+// ---------- CHECKY ----------
 function toggleSpecialCheck(type) {
   dailyChecks[type] = !dailyChecks[type];
   localStorage.setItem("checks-" + todayKey, JSON.stringify(dailyChecks));
@@ -223,8 +279,115 @@ function toggleSpecialCheck(type) {
 }
 
 function renderSpecialChecks() {
-  document.getElementById("morningStatus").innerText = dailyChecks.morning ? "Potvrzeno" : "Nepotvrzeno";
-  document.getElementById("eveningStatus").innerText = dailyChecks.evening ? "Potvrzeno" : "Nepotvrzeno";
+  document.getElementById("morningStatus").innerText =
+    dailyChecks.morning ? "Potvrzeno" : "Nepotvrzeno";
+  document.getElementById("eveningStatus").innerText =
+    dailyChecks.evening ? "Potvrzeno" : "Nepotvrzeno";
+}
+
+// ---------- TRÉNINKY ----------
+function toggleWorkoutItem(id, button, row) {
+  workoutSaved[id] = !workoutSaved[id];
+  localStorage.setItem("workout-" + todayKey, JSON.stringify(workoutSaved));
+
+  if (workoutSaved[id]) {
+    row.classList.add("done");
+    button.innerText = "Hotovo";
+  } else {
+    row.classList.remove("done");
+    button.innerText = "Splnit";
+  }
+
+  updateScore();
+  renderHistory();
+  renderWeeklySummary();
+}
+
+function createWorkoutRow(text, id) {
+  const li = document.createElement("li");
+  const btn = document.createElement("button");
+
+  li.textContent = text + " ";
+  btn.className = "inline-btn";
+
+  if (workoutSaved[id]) {
+    li.classList.add("done");
+    btn.innerText = "Hotovo";
+  } else {
+    btn.innerText = "Splnit";
+  }
+
+  btn.onclick = () => toggleWorkoutItem(id, btn, li);
+  li.appendChild(btn);
+
+  return li;
+}
+
+function renderWorkout() {
+  const info = document.getElementById("workoutInfo");
+  const container = document.getElementById("workoutContainer");
+  container.innerHTML = "";
+
+  if (trainingType === "A") {
+    info.innerHTML = "<strong>Trénink A:</strong> 4 kola. Cíl je odjet všechna kola, ne se zničit. Pauza 60–90 s mezi koly.";
+
+    for (let round = 1; round <= 4; round++) {
+      const box = document.createElement("div");
+      box.className = "workout-round";
+
+      const title = document.createElement("h4");
+      title.innerText = "Kolo " + round;
+      box.appendChild(title);
+
+      const ul = document.createElement("ul");
+      ul.className = "exercise-list";
+      ul.appendChild(createWorkoutRow("10 kliků", "A-" + round + "-1"));
+      ul.appendChild(createWorkoutRow("15 dřepů", "A-" + round + "-2"));
+      ul.appendChild(createWorkoutRow("8 angličáků", "A-" + round + "-3"));
+      ul.appendChild(createWorkoutRow("30 s plank", "A-" + round + "-4"));
+      box.appendChild(ul);
+
+      container.appendChild(box);
+    }
+  } else if (trainingType === "B") {
+    info.innerHTML = "<strong>Trénink B:</strong> 3 min rozklus, pak 6–8 kol 30 s svižně / 60 s chůze, nakonec 3 min výklus.";
+
+    const box = document.createElement("div");
+    box.className = "workout-round";
+
+    const ul = document.createElement("ul");
+    ul.className = "exercise-list";
+    ul.appendChild(createWorkoutRow("3 min rozklus", "B-warmup"));
+
+    for (let round = 1; round <= 8; round++) {
+      ul.appendChild(createWorkoutRow("Kolo " + round + ": 30 s svižně + 60 s chůze", "B-" + round));
+    }
+
+    ul.appendChild(createWorkoutRow("3 min výklus", "B-cooldown"));
+    box.appendChild(ul);
+    container.appendChild(box);
+  } else if (trainingType === "walk") {
+    info.innerHTML = "<strong>Dnes:</strong> chůze nebo volno. Dej aspoň kroky a drž režim.";
+  } else if (trainingType === "light") {
+    info.innerHTML = "<strong>Dnes:</strong> lehký pohyb. Kolo, procházka nebo lehká aktivita.";
+  } else {
+    info.innerHTML = "<strong>Dnes:</strong> volno. Ale režim jídla a kroky pořád platí.";
+  }
+}
+
+// ---------- SKÓRE ----------
+function getWorkoutTotalCountForDay(dateKey) {
+  const date = new Date(dateKey + "T12:00:00");
+  const day = date.getDay();
+
+  if (day === 1 || day === 4) return 16; // 4 kola × 4 cviky
+  if (day === 2 || day === 5) return 10; // rozklus + 8 kol + výklus
+  return 0;
+}
+
+function getWorkoutDoneCountForDay(dateKey) {
+  const data = JSON.parse(localStorage.getItem("workout-" + dateKey)) || {};
+  return Object.values(data).filter(v => v).length;
 }
 
 function getDoneTasksCount(dateKey) {
@@ -237,23 +400,29 @@ function getDoneChecksCount(dateKey) {
   return Object.values(checks).filter(v => v).length;
 }
 
-function getTotalItemsPerDay() {
-  return tasks.length + specialChecks.length;
+function getTotalItemsPerDay(dateKey) {
+  return tasks.length + specialChecks.length + getWorkoutTotalCountForDay(dateKey);
 }
 
 function getDayPercent(dateKey) {
   const doneTasks = getDoneTasksCount(dateKey);
   const doneChecks = getDoneChecksCount(dateKey);
-  const done = doneTasks + doneChecks;
-  const total = getTotalItemsPerDay();
+  const doneWorkout = getWorkoutDoneCountForDay(dateKey);
+  const total = getTotalItemsPerDay(dateKey);
+
+  if (total === 0) return 0;
+
+  const done = doneTasks + doneChecks + doneWorkout;
   return Math.round((done / total) * 100) || 0;
 }
 
 function updateScore() {
   let doneTasks = Object.values(saved).filter(v => v).length;
   let doneChecks = Object.values(dailyChecks).filter(v => v).length;
-  let total = getTotalItemsPerDay();
-  let percent = Math.round(((doneTasks + doneChecks) / total) * 100) || 0;
+  let doneWorkout = Object.values(workoutSaved).filter(v => v).length;
+  let total = getTotalItemsPerDay(todayKey);
+
+  let percent = total > 0 ? Math.round(((doneTasks + doneChecks + doneWorkout) / total) * 100) : 0;
 
   let text = percent + "% – ";
   let el = document.getElementById("score");
@@ -264,7 +433,7 @@ function updateScore() {
     text += "Perfektní den";
   } else if (percent >= 75) {
     el.classList.add("ok");
-    text += "Dobrý den, ale ještě tam máš rezervu";
+    text += "Dobrý den, ale pořád tam máš rezervu";
   } else {
     el.classList.add("bad");
     text += "Slabý den. Tady se to láme.";
@@ -273,6 +442,7 @@ function updateScore() {
   el.innerText = text;
 }
 
+// ---------- VÁHA ----------
 function saveWeight() {
   let val = document.getElementById("weightInput").value;
   if (!val) return;
@@ -311,6 +481,7 @@ function loadChart() {
   });
 }
 
+// ---------- HISTORIE A SOUHRN ----------
 function formatDate(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -388,7 +559,7 @@ function renderWeeklySummary() {
 
   if (weeklyAverage >= 85) {
     ratingEl.classList.add("good");
-    ratingEl.innerText = "Hodnocení týdne: Výborné. Tohle dělá výsledek.";
+    ratingEl.innerText = "Hodnocení týdne: Výborné. Tohle už dělá výsledek.";
   } else if (weeklyAverage >= 65) {
     ratingEl.classList.add("ok");
     ratingEl.innerText = "Hodnocení týdne: Solidní. Funguje to, ale máš rezervy.";
@@ -398,7 +569,9 @@ function renderWeeklySummary() {
   }
 }
 
+// ---------- START ----------
 renderSpecialChecks();
+renderWorkout();
 updateScore();
 loadChart();
 renderHistory();
